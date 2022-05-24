@@ -1,6 +1,6 @@
 -module(db).
 -export([store_user/1,store_message_for_user/2,get_users/0,get_mesagges/1,initDB/0,deleteDB/0,deleteDB2/0,get_apps/0,get_mesagges/2,get_mesagges/0,generate/1,generate_id/0,delete/0]).
--export([get_last_messages/1,get_last_n_messages/3,delete_user/1]).
+-export([get_last_messages/3,get_last_n_messages/3,delete_user/1]).
 -record(users,{username,message = []}).
 -record(messages,{id,app_name,time_stamp,type,value}).
 -include_lib("stdlib/include/qlc.hrl").
@@ -131,8 +131,8 @@ generate(List) ->
 			Id+1
 	end.
 	
-get_last_messages(N)->
-	Messages = get_mesagges(),
+get_last_messages(App_name,Type,N)->
+	Messages = get_mesagges(App_name,Type),
 	get_last_n_messages(N,Messages,[]).
 
 get_last_n_messages(0,_Messages,LastMsgs) ->

@@ -1,18 +1,16 @@
 -module(chat_client).
 -behaviour(gen_server).
 
--export([init/1,handle_call/3,handle_cast/2,handle_info/2,terminate/2,code_change/3,send/1,subscribe/1,unsubscribe/1]).
--export([start_link/0,stop/0]).
+-export([init/1,handle_call/3,handle_cast/2,handle_info/2,terminate/2,code_change/3,send/2,subscribe/1,unsubscribe/1]).
+-export([start_link/0]).
 %%api
 start_link()->
 	gen_server:start_link({global,?MODULE},?MODULE,[],[]).
 
-stop()->
-	gen_server:cast({global,?MODULE},stop).
 
 
-send(Msg) ->
-	gen_server:cast({global,?MODULE},{send,Msg}).
+send(Username,Msg) ->
+	gen_server:cast({global,?MODULE},{send,Username,Msg}).
 
 subscribe(Username) ->
 	gen_server:cast({global,?MODULE},{subscribe,Username}).
@@ -27,12 +25,13 @@ init([]) ->
 	{ok,Socket}.
 	
 
+
 	
 handle_call(_Req,_From,State) ->
 	{reply,ok,State}.
 
-handle_cast({send,Msg},State) ->
-	gen_tcp:send(State,Msg),
+handle_cast({send,Usernaeme,Msg},State) ->
+	gen_tcp:send(State,"send" ++ Usernaeme ++ "|" ++ Msg),
 	{noreply,State};
 
 handle_cast({unsubscribe,Username},State) ->
