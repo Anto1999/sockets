@@ -1,15 +1,42 @@
 -module(db).
--export([store_user/1,store_message_for_user/2,get_users/0,get_messages/1,initDB/0,deleteDB/0,deleteDB2/0,get_apps/0,get_messages/2,get_messages/0,generate/1,generate_id/0,delete/0]).
--export([get_last_messages/3,get_last_n_messages/3,delete_user/1]).
--record(users,{username,message = []}).
+-export([store_message_for_user/2,get_users/0,get_messages/1,initDB/0,deleteDB/0,deleteDB2/0,get_apps/0,get_messages/2,get_messages/0,generate/1,generate_id/0,delete/0]).
+-export([get_last_messages/3,get_last_n_messages/3,delete_user/1,get_user_by_username/1,user_in_app/2,store_user/2,get_users_in_app/0,store_message/1]).
+-record(users,{username,message = [],app}).
 -record(messages,{id,app_name,time_stamp,type,value}).
 -include_lib("stdlib/include/qlc.hrl").
-store_user(Name) ->
+store_user(Name, App) ->
+	io:format("Mnesia: ~p ~p ~n",[Name, App]),
 	AF = fun()->
-		mnesia:write(#users{username=Name})
+		mnesia:write(#users{username=Name,app=App})
 	end,
 	mnesia:transaction(AF).
 
+get_user_by_username(Username) ->
+		AF = fun() ->
+		Query = qlc:q([X || X <- mnesia:table(users),
+		X#users.username =:=  Username]),
+		Results = qlc:e(Query),
+		lists:map(fun(Item) -> Item#users.username end,Results)
+	end,
+	{atomic,Users} = mnesia:transaction(AF),
+	Users.
+store_message({App_name,Time_stamp,Type,Value}) ->
+	AF = fun() ->
+		mnesia:write(#messages{id=generate_id(),app_name = App_name,time_stamp=Time_stamp,type=Type,value=Value})
+	end,
+	mnesia:transaction(AF).
+	
+user_in_app(Username,App) ->
+	AF = fun() ->
+		Query = qlc:q([X || X <- mnesia:table(users),
+		X#users.username =:= Username,
+		X#users.app =:= App]),
+		
+		Results = qlc:e(Query),
+		lists:map(fun(Item) -> Item#users.username end,Results)
+	end,
+	{atomic,User} = mnesia:transaction(AF),
+	User.	
 
 delete_user(Name) ->
 	AF = fun() ->
@@ -25,12 +52,13 @@ delete_user(Name) ->
 
 
 store_message_for_user(Username,Msg) ->
+
 	{App_name,Time_stamp,Type,Value} = Msg,
 	AF = fun() ->
 		Query = qlc:q([ X || X <- mnesia:table(users),
 		X#users.username =:= Username]),
 	User = qlc:e(Query),
-	[{users,_Usrnme,Messages}] = User,
+	[{users,_Usrnme,Messages,_App}] = User,
 	mnesia:write(#messages{id=generate_id(),app_name = App_name,time_stamp=Time_stamp,type=Type,value=Value}),
 	mnesia:write(#users{username=Username,message=[Msg|Messages]})
 	end,
@@ -43,6 +71,15 @@ get_users() ->
 		Query = qlc:q([X || X <- mnesia:table(users)]),
 		Results = qlc:e(Query),
 		lists:map(fun(Item) -> Item#users.username end,Results)
+	end,
+	{atomic,Users} = mnesia:transaction(AF),
+	Users.
+
+get_users_in_app() ->
+	AF = fun() ->
+		Query = qlc:q([X || X <- mnesia:table(users)]),
+		Results = qlc:e(Query),
+		lists:map(fun(Item) -> {Item#users.username,Item#users.app} end,Results)
 	end,
 	{atomic,Users} = mnesia:transaction(AF),
 	Users.

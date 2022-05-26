@@ -60,6 +60,7 @@ send(BinaryMsg) ->
 	end.
 	
 send_message(Message) ->
+	io:format("Pogledaj type: ~p~n",[Message]),
 	case lists:nth(2,tl(Message)) of
 		"ERROR" ->
 			gen_server:call({global,?MODULE},{send,hd(Message),list_to_tuple(tl(Message))});
@@ -90,13 +91,13 @@ validate(BinaryMsg) ->
 	io:format("~p~n",[ListOfStrings]),
 	[Head|_Tail] = ListOfStrings,
 	case Head of
-		"Subscribe" -> 	gen_server:call({global,?MODULE},{subscribe,lists:last(ListOfStrings)});
+		"Subscribe" -> 	gen_server:call({global,?MODULE},{subscribe,list_to_tuple(tl(ListOfStrings))});
 		"Unsubscribe" -> gen_server:call({global,?MODULE},{unsubscribe,lists:last(ListOfStrings)});
 		_ -> io:format("Not valid format!~n")
 	end.
 	
 is_user_subscribed(Username) ->
-	Accounts = db:get_users(),
+	Accounts = db:get_user_by_username(Username),
 	case lists:member(Username,Accounts) of
 			true ->
 				true;
@@ -106,18 +107,25 @@ is_user_subscribed(Username) ->
 		end.
 
 
-handle_call({subscribe,Username},_From,State) ->
+handle_call({subscribe, {Username, App_name}}, _From, State) ->
+	io:format("~p~n",[App_name]),
 	Accounts = db:get_users(),
 	case lists:member(Username,Accounts) of
 			true ->
 				io:format("User: ~p is alrdy subscribed. ~n", [Username]),
 				{reply,ok,State};
 			false ->
-				db:store_user(Username),
-				db:store_message_for_user(Username,{"App",calendar:universal_time(),"INFO","User: " ++ Username ++ " is  subscribed" }),
+				db:store_user(Username,App_name),
+				db:store_message({App_name,calendar:universal_time(),"INFO","User: " ++ Username ++ " is  subscribed." }),
 				io:format("User: ~p is subscribed now. ~n",[Username]),
 				{reply,ok,State}
 		end;
+		
+		
+		
+		
+		
+		
 
 handle_call({unsubscribe,Username},_From,State) ->
 	Accounts = db:get_users(),
@@ -138,9 +146,18 @@ handle_call({send,Username,Message},_From,State) ->
 	{App,Type,Msg} = Message,
 	Time = calendar:universal_time(),
 	StoreMsg = {App,Time,Type,Msg},
-	db:store_message_for_user(Username,StoreMsg),
-	io:format("Message: ~p stored by user: ~p",[Message,Username]),
-	{reply,ok,State};
+	User_in_app = db:user_in_app(Username,App),
+	io:format("User in app:~p~n",[User_in_app]),
+	io:format("~p   ~p ~n",[Username,App]),
+	case User_in_app of
+		[] -> io:format("User is not in app.~n"),
+				{reply,ok,State};
+		
+		_ ->
+			db:store_message_for_user(Username,StoreMsg),
+			io:format("Message: ~p stored by user: ~p~n",[Message,Username]),
+			{reply,ok,State}
+		end;
 	
 handle_call(_Req,_From,State) ->
 	{reply,ok,State}.
@@ -158,17 +175,21 @@ handle_cast({logs,AppName},State)->
 handle_cast({crash},State) ->
 	Time = calendar:universal_time(),
 	StoreMsg = {"Server",Time,"ERROR","Chat server started."},
-	db:store_message_for_user("server",StoreMsg),
+	db:store_message(StoreMsg),
 	{noreply,State};
 
-handle_cast({crashServer},State) ->
-	"Glupo je" = 100101,
+
+
+
+
+
+handle_cast({crashServer, Username, App},State) ->
+	exit({Username,App}),
 	{noreply,State};
 	
 handle_cast({started},State)->
 	Time = calendar:universal_time(),
-	StoreMsg = {"Server",Time,"INFO","Chat server started."},
-	db:store_message_for_user("server",StoreMsg),
+	db:store_message({"Server",Time,"INFO","Chat server started."}),
 	{noreply,State};
 
 handle_cast({logs,AppName,Type},State)->
@@ -187,11 +208,9 @@ handle_cast(_Req,State) ->
 handle_info(Info,State) ->
 	{noreply,Info,State}.
 
-terminate(_reason,_state) ->
-	Time = calendar:universal_time(),
-	StoreMsg = {"Server",Time,"ERROR","Chat server stopped."},
-	db:store_message_for_user("server",StoreMsg),
-	io:format("Terminating ~p~n",[{local,?MODULE}]),
+terminate(Reason,_state) ->
+	{Username, App} = Reason,
+	db:store_message({App,calendar:universal_time(),"ERROR", Username ++ "crash server"}),
 	ok.
 
 code_change(_OldVsn,State,_Extra) ->
