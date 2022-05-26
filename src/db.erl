@@ -1,5 +1,5 @@
 -module(db).
--export([store_user/1,store_message_for_user/2,get_users/0,get_mesagges/1,initDB/0,deleteDB/0,deleteDB2/0,get_apps/0,get_mesagges/2,get_mesagges/0,generate/1,generate_id/0,delete/0]).
+-export([store_user/1,store_message_for_user/2,get_users/0,get_messages/1,initDB/0,deleteDB/0,deleteDB2/0,get_apps/0,get_messages/2,get_messages/0,generate/1,generate_id/0,delete/0]).
 -export([get_last_messages/3,get_last_n_messages/3,delete_user/1]).
 -record(users,{username,message = []}).
 -record(messages,{id,app_name,time_stamp,type,value}).
@@ -48,7 +48,7 @@ get_users() ->
 	Users.
 	
 	
-get_mesagges() ->
+get_messages() ->
 	AF = fun() ->
 		Query = qlc:q([X || X <- mnesia:table(messages)]),
 		
@@ -59,7 +59,7 @@ get_mesagges() ->
 	Messages.	
 	
 	
-get_mesagges(App_name) ->
+get_messages(App_name) ->
 	AF = fun() ->
 		Query = qlc:q([X || X <- mnesia:table(messages),
 		X#messages.app_name =:= App_name]),
@@ -70,7 +70,7 @@ get_mesagges(App_name) ->
 	{atomic,Messages} = mnesia:transaction(AF),
 	Messages.
 
-get_mesagges(App_name,Type) ->
+get_messages(App_name,Type) ->
 	AF = fun() ->
 		Query = qlc:q([X || X <- mnesia:table(messages),
 		X#messages.app_name =:= App_name,
@@ -118,7 +118,7 @@ deleteDB2() ->
 	
 	
 generate_id() ->
-	Messages = get_mesagges(),
+	Messages = get_messages(),
 	generate(Messages).
 	
 	
@@ -132,7 +132,7 @@ generate(List) ->
 	end.
 	
 get_last_messages(App_name,Type,N)->
-	Messages = get_mesagges(App_name,Type),
+	Messages = get_messages(App_name,Type),
 	get_last_n_messages(N,Messages,[]).
 
 get_last_n_messages(0,_Messages,LastMsgs) ->
