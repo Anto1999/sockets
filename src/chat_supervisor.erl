@@ -7,7 +7,8 @@
 
 start_link() ->
 	{ok,Pid} = supervisor:start_link({global,?MODULE},?MODULE,[]),
-	unlink(Pid).
+	unlink(Pid),
+	{ok,Pid}.
 stop() ->
 	chat_operator:stop(),
 	chat_client:stop(),
